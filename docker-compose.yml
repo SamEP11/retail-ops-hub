@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: retail_ops
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"   # si 5432 está ocupado: DB_PORT=5433 en .env
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -22,8 +22,8 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # Sin "ports": la API lo usa por la red interna de Docker (redis:6379),
+    # así no choca con otro Redis que tengas corriendo en tu PC.
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
