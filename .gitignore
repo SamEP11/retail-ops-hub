@@ -1,0 +1,22 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Node (sprint 2 en adelante)
+node_modules/
+dist/
+
+# Secretos y local
+.env
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

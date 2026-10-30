@@ -1,0 +1,5 @@
+# Finales de línea LF en el repo aunque trabajes en Windows:
+# los scripts que corren dentro de Docker (Linux) fallan con CRLF.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
