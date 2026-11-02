@@ -40,12 +40,7 @@ def list_users(
 
 @router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 def create_user(data: UserCreate, db: DbSession, actor: CanManage, request: Request) -> User:
-    try:
-        return users.create(db, data, actor_id=actor.id, ip=client_ip(request))
-    except users.EmailAlreadyExistsError:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT, "Ya existe un usuario con ese email"
-        ) from None
+    return users.create(db, data, actor_id=actor.id, ip=client_ip(request))
 
 
 @router.get("/{user_id}", response_model=UserOut)
@@ -63,9 +58,4 @@ def update_user(
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Usuario no encontrado")
-    try:
-        return users.update(db, user, data, actor_id=actor.id, ip=client_ip(request))
-    except users.LastAdminError:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT, "Debe quedar al menos un administrador activo"
-        ) from None
+    return users.update(db, user, data, actor_id=actor.id, ip=client_ip(request))

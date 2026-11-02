@@ -1,6 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.errors import ConflictError
 from app.core.security import hash_password
 from app.models import User
 from app.permissions import Role
@@ -8,12 +9,16 @@ from app.schemas.user import UserCreate, UserUpdate
 from app.services import audit
 
 
-class EmailAlreadyExistsError(Exception):
-    pass
+class EmailAlreadyExistsError(ConflictError):
+    def __init__(self) -> None:
+        super().__init__("Ya existe un usuario con ese email")
 
 
-class LastAdminError(Exception):
+class LastAdminError(ConflictError):
     """No se puede desactivar ni degradar al último administrador activo."""
+
+    def __init__(self) -> None:
+        super().__init__("Debe quedar al menos un administrador activo")
 
 
 def get_by_email(db: Session, email: str) -> User | None:
@@ -22,7 +27,7 @@ def get_by_email(db: Session, email: str) -> User | None:
 
 def create(db: Session, data: UserCreate, *, actor_id: int | None, ip: str | None) -> User:
     if get_by_email(db, data.email):
-        raise EmailAlreadyExistsError(data.email)
+        raise EmailAlreadyExistsError()
     user = User(
         email=data.email.lower(),
         full_name=data.full_name,
