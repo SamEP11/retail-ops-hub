@@ -36,6 +36,7 @@ services:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/retail_ops
       TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/retail_ops_test
       REDIS_URL: redis://redis:6379/0
+      TEST_REDIS_URL: redis://redis:6379/15
     ports:
       - "8000:8000"
     depends_on:
@@ -48,5 +49,23 @@ services:
     volumes:
       - ./backend:/app
 
+  # Panel web en modo desarrollo (Vite con recarga en caliente): http://localhost:5173
+  # Para producción se usa frontend/Dockerfile (build + nginx).
+  web:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev"
+    environment:
+      API_PROXY_TARGET: http://api:8000
+      VITE_POLLING: "true"  # en Windows los cambios de archivos no llegan sin polling
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - web_node_modules:/app/node_modules  # los node_modules de Linux no pisan los de tu PC
+    depends_on:
+      - api
+
 volumes:
+  web_node_modules:
   pgdata:

@@ -27,15 +27,22 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
 
     env:
       TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/retail_ops_test
       DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/retail_ops_test
+      TEST_REDIS_URL: redis://localhost:6379/15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -60,10 +67,41 @@ jobs:
       - name: Tests
         run: pytest
 
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint (eslint)
+        run: npm run lint
+
+      - name: Tipos (tsc)
+        run: npm run typecheck
+
+      - name: Tests (vitest)
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
   docker:
     runs-on: ubuntu-latest
-    needs: backend
+    needs: [backend, frontend]
     steps:
-      - uses: actions/checkout@v4
-      - name: Build de la imagen
-        run: docker build -t retail-ops-api ./backend
+      - uses: actions/checkout@v5
+      - name: Build de las imágenes
+        run: |
+          docker build -t retail-ops-api ./backend
+          docker build -t retail-ops-web ./frontend
