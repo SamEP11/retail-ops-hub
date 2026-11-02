@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 30
 
+    redis_url: str = "redis://localhost:6379/0"
+    login_max_attempts: int = 5  # fallos por email dentro de la ventana
+    login_max_attempts_per_ip: int = 20
+    login_window_seconds: int = 15 * 60
+
     cors_origins: list[str] = ["http://localhost:5173"]
     log_level: str = "INFO"
 
