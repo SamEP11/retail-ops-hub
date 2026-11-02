@@ -20,3 +20,6 @@ dist/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Redis local
+dump.rdb
