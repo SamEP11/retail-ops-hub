@@ -14,6 +14,8 @@ os.environ["DATABASE_URL"] = os.environ.get(
     "postgresql+psycopg://postgres:postgres@localhost:5432/retail_ops_test",
 )
 os.environ["ENVIRONMENT"] = "test"
+# Base 15 de Redis solo para tests: se limpia entre tests sin tocar datos de desarrollo.
+os.environ["REDIS_URL"] = os.environ.get("TEST_REDIS_URL", "redis://localhost:6379/15")
 os.environ["JWT_SECRET"] = "secreto-solo-para-tests-1234567890"
 
 import pytest  # noqa: E402
@@ -23,6 +25,7 @@ from sqlalchemy import text  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from alembic import command  # noqa: E402
+from app.core.ratelimit import get_redis  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import User  # noqa: E402
@@ -46,9 +49,15 @@ def _migrated_db() -> Iterator[None]:
 @pytest.fixture(autouse=True)
 def _clean_tables() -> Iterator[None]:
     """Cada test arranca con tablas vacías: los tests no dependen del orden."""
+    get_redis().flushdb()
     yield
     with engine.begin() as conn:
-        conn.execute(text("TRUNCATE audit_logs, users RESTART IDENTITY CASCADE"))
+        conn.execute(
+            text(
+                "TRUNCATE audit_logs, users, prices, variants, products, categories, coupons "
+                "RESTART IDENTITY CASCADE"
+            )
+        )
 
 
 @pytest.fixture
@@ -86,6 +95,16 @@ def make_user(db: Session) -> Callable[..., User]:
         return user
 
     return _make
+
+
+@pytest.fixture
+def as_role(make_user: Callable[..., User], login: Callable[[User], dict[str, str]]):
+    """Headers de un usuario nuevo con el rol pedido: `as_role(Role.BODEGA)`."""
+
+    def _as(role: Role) -> dict[str, str]:
+        return login(make_user(role))
+
+    return _as
 
 
 @pytest.fixture

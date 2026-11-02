@@ -6,9 +6,11 @@ from collections.abc import Awaitable, Callable
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 
-from app.api.routes import audit, auth, health, users
+from app.api.routes import audit, auth, catalog, catalog_import, coupons, health, users
 from app.core.config import get_settings
+from app.core.errors import DomainError
 from app.core.logging import setup_logging
 
 settings = get_settings()
@@ -59,6 +61,22 @@ async def request_context(
     return response
 
 
+@app.exception_handler(DomainError)
+async def domain_error(_: Request, exc: DomainError) -> JSONResponse:
+    """Traduce los errores de los servicios al código HTTP que les corresponde."""
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error(_: Request, exc: IntegrityError) -> JSONResponse:
+    """Red de seguridad: si dos peticiones simultáneas pasan la validación y chocan en un
+    UNIQUE de la base, respondemos 409 en lugar de un 500."""
+    log.warning("integrity error", extra={"msg_detail": str(exc.orig)})
+    return JSONResponse(status_code=409, content={"detail": "Conflicto con un registro existente"})
+
+
 app.include_router(health.router)
-for router in (auth.router, users.router, audit.router):
+routers = (auth, users, audit, catalog, catalog_import, coupons)
+for module in routers:
+    router = module.router
     app.include_router(router, prefix="/api/v1")

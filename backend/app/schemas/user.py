@@ -4,6 +4,9 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.permissions import Role
+from app.schemas.common import Page
+
+__all__ = ["AuditOut", "MeOut", "Page", "UserCreate", "UserOut", "UserUpdate"]
 
 
 class UserCreate(BaseModel):
@@ -46,10 +49,3 @@ class AuditOut(BaseModel):
     entity_id: str | None
     changes: dict[str, Any]
     created_at: datetime
-
-
-class Page[T](BaseModel):
-    items: list[T]
-    total: int
-    limit: int
-    offset: int

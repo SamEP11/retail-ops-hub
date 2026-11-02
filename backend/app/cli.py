@@ -8,11 +8,15 @@ import argparse
 import getpass
 import sys
 
+from sqlalchemy import select
+
+from app import demo_data
 from app.core.config import get_settings
 from app.db.session import SessionLocal
+from app.models import Category
 from app.permissions import Role
 from app.schemas.user import UserCreate
-from app.services import users
+from app.services import catalog_import, users
 
 DEMO_PASSWORD = "Demo12345!"  # solo para entorno local; documentado en el README
 DEMO_USERS = [
@@ -50,6 +54,21 @@ def seed() -> None:
                 ip=None,
             )
             print(f"creado: {email} ({role.value})")
+
+        for name, slug in demo_data.CATEGORIES:
+            if not db.scalar(select(Category).where(Category.slug == slug)):
+                db.add(Category(name=name, slug=slug))
+        db.commit()
+        report = catalog_import.run(
+            db, filename="demo.csv", content=demo_data.catalog_csv(), dry_run=False,
+            actor_id=None, ip=None,
+        )  # fmt: skip
+        if report.errors:
+            sys.exit(f"Errores en el catálogo demo: {report.errors}")
+        print(
+            f"catálogo demo: {report.products_created} productos y "
+            f"{report.variants_created} variantes nuevas"
+        )
 
 
 def main() -> None:

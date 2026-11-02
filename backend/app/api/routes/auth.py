@@ -5,6 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from app.api.deps import CurrentUser, DbSession, client_ip
 from app.core.config import get_settings
+from app.core.ratelimit import LoginLimiter, get_login_limiter
 from app.core.security import create_access_token, hash_password, verify_password
 from app.permissions import ROLE_PERMISSIONS
 from app.schemas.auth import Token
@@ -23,17 +24,33 @@ def login(
     db: DbSession,
     request: Request,
     form: Annotated[OAuth2PasswordRequestForm, Depends()],
+    limiter: Annotated[LoginLimiter, Depends(get_login_limiter)],
 ) -> Token:
+    ip = client_ip(request)
+    blocked = limiter.check(form.username, ip)
+    if blocked:
+        audit.record(
+            db, action="auth.login_blocked", entity="user",
+            changes={"email": form.username.lower()}, ip=ip,
+        )  # fmt: skip
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos fallidos. Intenta más tarde.",
+            headers={"Retry-After": str(blocked.retry_after)},
+        )
+
     user = users.get_by_email(db, form.username)
     password_ok = verify_password(form.password, user.hashed_password if user else _DUMMY_HASH)
 
     if user is None or not password_ok or not user.is_active:
+        limiter.register_failure(form.username, ip)
         audit.record(
             db,
             action="auth.login_failed",
             entity="user",
             changes={"email": form.username.lower()},
-            ip=client_ip(request),
+            ip=ip,
         )
         db.commit()
         raise HTTPException(
@@ -42,13 +59,14 @@ def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    limiter.reset(form.username)
     audit.record(
         db,
         action="auth.login",
         entity="user",
         entity_id=user.id,
         actor_id=user.id,
-        ip=client_ip(request),
+        ip=ip,
     )
     db.commit()
     settings = get_settings()
